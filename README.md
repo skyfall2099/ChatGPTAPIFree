@@ -4,18 +4,18 @@ A simple and open-source proxy API for Google's Gemini API.
 
 ## Usage
 
-Send a POST request to your proxy endpoint:
+Send a POST request to your proxy endpoint with your API key as a query parameter:
 
 ```sh
 # Streaming response
-curl http://localhost:8080/v1beta/models/gemini-2.0-flash:streamGenerateContent \
+curl "http://localhost:8080/v1beta/models/gemini-3-flash-preview:streamGenerateContent?key=YOUR_API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{
   "contents": [{"parts": [{"text": "Hello, how are you?"}]}]
 }'
 
 # Non-streaming response
-curl http://localhost:8080/v1beta/models/gemini-2.0-flash:generateContent \
+curl "http://localhost:8080/v1beta/models/gemini-3-flash-preview:generateContent?key=YOUR_API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{
   "contents": [{"parts": [{"text": "Hello, how are you?"}]}]
@@ -25,7 +25,7 @@ curl http://localhost:8080/v1beta/models/gemini-2.0-flash:generateContent \
 You can also use the default model endpoint:
 
 ```sh
-curl http://localhost:8080/v1beta/models/streamGenerateContent \
+curl "http://localhost:8080/v1beta/models/streamGenerateContent?key=YOUR_API_KEY" \
   -H 'Content-Type: application/json' \
   -d '{
   "contents": [{"parts": [{"text": "Hello!"}]}]
@@ -43,29 +43,35 @@ curl http://localhost:8080/v1beta/models/streamGenerateContent \
 
 ## Authentication
 
-The proxy supports two authentication methods:
+API users must provide their own Gemini API key. Two methods are supported:
 
-1. **Server-side API keys** (default): Configure `API_KEYS` in `.env`
-2. **Client-provided key**: Send `Authorization: Bearer YOUR_API_KEY` header
+1. **Query parameter** (recommended): `?key=YOUR_API_KEY`
+2. **Authorization header**: `Authorization: Bearer YOUR_API_KEY`
 
 ## Setup
 
-1. Get a Gemini API Key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-2. Clone this repository
-3. Copy `.env.example` to `.env` and configure:
+1. Clone this repository
+2. (Optional) Copy `.env.example` to `.env` to configure:
    ```
-   API_KEYS='["AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"]'
-   MODEL_NAME='gemini-2.0-flash'
-   PORT=8080
+   MODEL_NAME='gemini-3-flash-preview'  # Default model
+   PORT=8080                       # Server port
    ```
-4. Install dependencies: `npm install`
-5. Run: `npm start`
+3. Install dependencies: `npm install`
+4. Run: `npm start`
+
+Users will need to get their own Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
 
 ## Docker
 
 ```sh
 docker build -t gemini-proxy .
-docker run -p 8080:8080 --env-file .env gemini-proxy
+docker run -p 8080:8080 gemini-proxy
+```
+
+Or with custom configuration:
+
+```sh
+docker run -p 8080:8080 -e MODEL_NAME='gemini-3-flash-preview' gemini-proxy
 ```
 
 ## Privacy

@@ -9,8 +9,7 @@ const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
 const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
 
 const port = parseInt(process.env.PORT || '8080', 10);
-const api_keys = JSON.parse(process.env.API_KEYS);
-const modelName = process.env.MODEL_NAME || 'gemini-2.0-flash';
+const modelName = process.env.MODEL_NAME || 'gemini-3-flash-preview';
 const baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const corsHeaders = {
@@ -18,8 +17,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 };
-
-const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 const app = express();
 app.disable('etag');
@@ -44,13 +41,14 @@ const handlePost = async (req, res, isStreaming) => {
   }
 
   try {
-    // Get API key from header or use random from pool
+    // Get API key from query parameter or Authorization header
     const authHeader = req.get('Authorization');
-    let apiKey;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
+    let apiKey = req.query.key;
+    if (!apiKey && authHeader && authHeader.startsWith('Bearer ')) {
       apiKey = authHeader.substring(7);
-    } else {
-      apiKey = randomChoice(api_keys);
+    }
+    if (!apiKey) {
+      return res.status(401).set(corsHeaders).type('text/plain').send('API key required. Provide via ?key=xxx query parameter or Authorization: Bearer xxx header');
     }
 
     // Get model from URL params or use default
