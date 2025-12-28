@@ -106,6 +106,12 @@ const handlePost = async (req, res, isStreaming) => {
   }
 };
 
+// Simple root routes (use ?stream=false for non-streaming, default is streaming)
+app.post('/', (req, res) => {
+  const isStreaming = req.query.stream !== 'false';
+  handlePost(req, res, isStreaming);
+});
+
 // Routes for default model
 app.options('/v1beta/models/generateContent', handleOptions);
 app.post('/v1beta/models/generateContent', (req, res) => handlePost(req, res, false));
