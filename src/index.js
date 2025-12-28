@@ -21,6 +21,16 @@ const corsHeaders = {
 const app = express();
 app.disable('etag');
 app.disable('x-powered-by');
+
+// Global CORS middleware - applies to ALL requests
+app.use((req, res, next) => {
+  res.set(corsHeaders);
+  if (req.method === 'OPTIONS') {
+    return res.status(204).send();
+  }
+  next();
+});
+
 app.use(express.json());
 
 app.use((err, req, res, next) => {
