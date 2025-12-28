@@ -15,7 +15,7 @@ const baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, HEAD, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-goog-api-key',
 };
 
 const app = express();
