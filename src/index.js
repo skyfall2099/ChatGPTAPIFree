@@ -3,10 +3,15 @@ dotenv.config();
 
 import express from 'express';
 import fetch from 'node-fetch';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+
+const proxyUrl = process.env.HTTPS_PROXY || process.env.HTTP_PROXY;
+const agent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
 
 const port = parseInt(process.env.PORT || '8080', 10);
 const api_keys = JSON.parse(process.env.API_KEYS);
-const upstreamUrl = 'https://api.openai.com/v1/chat/completions';
+const modelName = process.env.MODEL_NAME || 'gemini-2.0-flash';
+const baseUrl = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -15,8 +20,6 @@ const corsHeaders = {
 };
 
 const randomChoice = (arr) => arr[Math.floor(Math.random() * arr.length)];
-
-const obfuscateOpenAIResponse = (text) => text.replace(/\borg-[a-zA-Z0-9]{24}\b/g, 'org-************************').replace(' Please add a payment method to your account to increase your rate limit. Visit https://platform.openai.com/account/billing to add a payment method.', '');
 
 const app = express();
 app.disable('etag');
@@ -34,48 +37,54 @@ const handleOptions = (req, res) => {
   res.setHeader('Access-Control-Max-Age', '1728000').set(corsHeaders).sendStatus(204);
 };
 
-const handlePost = async (req, res) => {
+const handlePost = async (req, res, isStreaming) => {
   const contentType = req.headers['content-type'];
   if (!contentType || contentType !== 'application/json') {
     return res.status(415).set(corsHeaders).type('text/plain').send("Unsupported media type. Use 'application/json' content type");
   }
 
-  const { stream } = req.body;
-  if (stream != null && stream !== true && stream !== false) {
-    return res.status(400).set(corsHeaders).type('text/plain').send('The `stream` parameter must be a boolean value');
-  }
-
   try {
+    // Get API key from header or use random from pool
     const authHeader = req.get('Authorization');
-    const authHeaderUpstream = authHeader || `Bearer ${randomChoice(api_keys)}`;
+    let apiKey;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      apiKey = authHeader.substring(7);
+    } else {
+      apiKey = randomChoice(api_keys);
+    }
+
+    // Get model from URL params or use default
+    const model = req.params.model || modelName;
+    const action = isStreaming ? 'streamGenerateContent' : 'generateContent';
+    const upstreamUrl = `${baseUrl}/${model}:${action}?key=${apiKey}`;
 
     const requestHeader = {
       'Content-Type': 'application/json',
-      'Authorization': authHeaderUpstream,
       'User-Agent': 'curl/7.64.1',
     };
+
     const resUpstream = await fetch(upstreamUrl, {
       method: 'POST',
       headers: requestHeader,
       body: JSON.stringify(req.body),
+      agent,
     });
 
     if (!resUpstream.ok) {
       const { status } = resUpstream;
       const text = await resUpstream.text();
-      const textObfuscated = obfuscateOpenAIResponse(text);
-      return res.status(status).set(corsHeaders).type('text/plain').send(`OpenAI API responded:\n\n${textObfuscated}`);
+      return res.status(status).set(corsHeaders).type('text/plain').send(`Gemini API responded:\n\n${text}`);
     }
 
-    const contentType = resUpstream.headers.get('content-type');
-    if (contentType) {
-      res.setHeader('Content-Type', contentType);
+    const resContentType = resUpstream.headers.get('content-type');
+    if (resContentType) {
+      res.setHeader('Content-Type', resContentType);
     }
     const contentLength = resUpstream.headers.get('content-length');
     if (contentLength) {
       res.setHeader('Content-Length', contentLength);
     }
-    if (stream) {
+    if (isStreaming) {
       res.setHeader('Connection', 'keep-alive');
     }
     res.set({
@@ -89,15 +98,23 @@ const handlePost = async (req, res) => {
   }
 };
 
-app.options('/v1/', handleOptions);
-app.post('/v1/', handlePost);
-app.options('/v1/chat/completions', handleOptions);
-app.post('/v1/chat/completions', handlePost);
+// Routes for default model
+app.options('/v1beta/models/generateContent', handleOptions);
+app.post('/v1beta/models/generateContent', (req, res) => handlePost(req, res, false));
+app.options('/v1beta/models/streamGenerateContent', handleOptions);
+app.post('/v1beta/models/streamGenerateContent', (req, res) => handlePost(req, res, true));
+
+// Routes with model parameter
+app.options('/v1beta/models/:model\\:generateContent', handleOptions);
+app.post('/v1beta/models/:model\\:generateContent', (req, res) => handlePost(req, res, false));
+app.options('/v1beta/models/:model\\:streamGenerateContent', handleOptions);
+app.post('/v1beta/models/:model\\:streamGenerateContent', (req, res) => handlePost(req, res, true));
 
 app.use('*', (req, res) => {
   res.status(404).set(corsHeaders).type('text/plain').send('Not found');
 });
 
 app.listen(port, () => {
-  console.log(`Server listening on port ${port}`);
+  console.log(`Gemini API proxy listening on port ${port}`);
+  console.log(`Default model: ${modelName}`);
 });
